@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -version)",
+      "Bash(ruby -e \"require 'xcodeproj'; puts 'xcodeproj OK'\")",
+      "Bash(python3 -c \"import pbxproj; print\\('pbxproj OK'\\)\")",
+      "Bash(gem install *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(xcodebuild build *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Read(//tmp/**)",
+      "Bash([ ! -f \"$F\" ])",
+      "Bash(rm -rf mlgen)",
+      "Bash(mkdir mlgen *)",
+      "Bash(xcrun coremlcompiler *)",
+      "Bash(xcodebuild -resolvePackageDependencies -project TripIn.xcodeproj -scheme TripIn)",
+      "Bash(export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all)",
+      "Bash(grep -iE \"Resolved source packages|could not|couldn|error|fatal|Checking out 2.309\" /tmp/resolve3.log)",
+      "Bash(grep -E \"error:|BUILD SUCCEEDED|BUILD FAILED|EXIT=\" /tmp/build_ml3.log)",
+      "Bash(grep -E \"error:|BUILD SUCCEEDED|BUILD FAILED|EXIT=\" /tmp/build_places.log)",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :DeepSeekKey\" TripIn/Config/APIKeys.plist)",
+      "Bash(curl -s https://api.deepseek.com/v1/chat/completions -H 'Content-Type: application/json' -H 'Authorization: Bearer __TRACKED_VAR__' -d '{\"model\":\"deepseek-chat\", *)",
+      "Bash(python3 -c ' *)",
+      "Bash(grep -E \"error:|BUILD SUCCEEDED|BUILD FAILED|EXIT=\" /tmp/build_step11b.log)",
+      "Bash(curl -s https://api.deepseek.com/v1/chat/completions -H 'Content-Type: application/json' -H 'Authorization: Bearer __TRACKED_VAR__' -d '{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Give concise travel tips for visiting \\\\\"Tanah Lot Temple\\\\\" \\(temple\\) at Tabanan, Bali. Return ONLY a JSON object, no markdown: {\\\\\"wear\\\\\":\\\\\"...\\\\\",\\\\\"bring\\\\\":\\\\\"...\\\\\",\\\\\"bestTime\\\\\":\\\\\"...\\\\\"} Each value is one short, practical sentence.\"}]}' -o /tmp/tips.json)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

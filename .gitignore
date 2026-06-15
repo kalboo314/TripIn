@@ -1,0 +1,23 @@
+# Secrets — never commit
+TripIn/Config/APIKeys.plist
+GoogleService-Info.plist
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+
+# CocoaPods (if used)
+Pods/
