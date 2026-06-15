@@ -3,21 +3,21 @@ import MapKit
 
 struct AttractionDetailView: View {
     let attraction: Attraction
-
-    @EnvironmentObject private var authViewModel: AuthViewModel
+    var onAddToItinerary: ((Attraction) -> Void)?
 
     @State private var tips: AttractionTips?
     @State private var isLoadingTips = false
     @State private var tipsError: String?
 
-    @State private var isAdding = false
-    @State private var didAdd = false
-    @State private var addError: String?
-
+    @State private var added: Bool
     @State private var region: MKCoordinateRegion
 
-    init(attraction: Attraction) {
+    init(attraction: Attraction,
+         isInItinerary: Bool = false,
+         onAddToItinerary: ((Attraction) -> Void)? = nil) {
         self.attraction = attraction
+        self.onAddToItinerary = onAddToItinerary
+        _added = State(initialValue: isInItinerary)
         _region = State(initialValue: MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: attraction.latitude, longitude: attraction.longitude),
             span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
@@ -167,25 +167,19 @@ struct AttractionDetailView: View {
 
     // MARK: - Actions
 
+    @ViewBuilder
     private var actionButtons: some View {
-        VStack(spacing: 8) {
+        if let onAddToItinerary {
             Button {
-                Task { await addToTrip() }
+                onAddToItinerary(attraction)
+                added.toggle()
             } label: {
-                if isAdding {
-                    ProgressView().tint(.white).frame(maxWidth: .infinity)
-                } else {
-                    Label(didAdd ? "Added to My Trips" : "Add to My Trip",
-                          systemImage: didAdd ? "checkmark.circle.fill" : "plus.circle.fill")
-                        .frame(maxWidth: .infinity)
-                }
+                Label(added ? "Added to itinerary" : "Add to itinerary",
+                      systemImage: added ? "checkmark.circle.fill" : "plus.circle.fill")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(isAdding || didAdd)
-
-            if let addError = addError {
-                Text(addError).font(.footnote).foregroundColor(.red)
-            }
+            .tint(added ? .green : Theme.coral)
         }
     }
 
@@ -201,43 +195,4 @@ struct AttractionDetailView: View {
         }
     }
 
-    private func addToTrip() async {
-        guard let uid = authViewModel.currentUser?.id else { return }
-        addError = nil
-        isAdding = true
-        defer { isAdding = false }
-        do {
-            try await FirestoreService.shared.saveTrip(makeSingleStopTrip(), for: uid)
-            didAdd = true
-        } catch {
-            addError = (error as? LocalizedError)?.errorDescription
-                ?? "Could not add to trip. Please try again."
-        }
-    }
-
-    /// Wraps the attraction in a one-stop ItineraryDay so it can be saved.
-    private func makeSingleStopTrip() -> ItineraryDay {
-        let slot = TimeSlot(
-            time: "09:00", endTime: "11:00", type: .attraction,
-            title: attraction.name, description: attraction.description,
-            location: attraction.address, estimatedCost: attraction.estimatedCost,
-            tip: "", durationMinutes: 120,
-            coordinate: hasCoordinate
-                ? CLLocationCoordinate2D(latitude: attraction.latitude, longitude: attraction.longitude)
-                : nil
-        )
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return ItineraryDay(
-            id: UUID().uuidString,
-            date: formatter.string(from: Date()),
-            city: attraction.name,
-            weather: WeatherSummary(condition: "", temperature: 0, uvIndex: 0,
-                                    recommendation: attraction.category),
-            slots: [slot],
-            packingList: [],
-            totalEstimatedCost: attraction.estimatedCost,
-            createdAt: Date()
-        )
-    }
 }

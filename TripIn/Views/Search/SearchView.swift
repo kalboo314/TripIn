@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct SearchView: View {
+    @EnvironmentObject private var authViewModel: AuthViewModel
     @StateObject private var viewModel = SearchViewModel()
+    @State private var showBuilder = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +25,31 @@ struct SearchView: View {
                 }
             }
             .navigationTitle("Plan a Day")
+            .safeAreaInset(edge: .bottom) {
+                if !viewModel.draft.isEmpty {
+                    Button { showBuilder = true } label: {
+                        Label("Build Itinerary (\(viewModel.draft.count))",
+                              systemImage: "list.bullet.rectangle.portrait")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding()
+                    .background(.ultraThinMaterial)
+                }
+            }
+            .sheet(isPresented: $showBuilder) {
+                NavigationStack {
+                    EditItineraryView(
+                        viewModel: TripBuilderViewModel.newFromAttractions(
+                            city: viewModel.city,
+                            date: viewModel.date,
+                            attractions: viewModel.draft,
+                            weather: viewModel.weatherSummary()),
+                        onSaved: { viewModel.clearDraft() }
+                    )
+                }
+                .environmentObject(authViewModel)
+            }
         }
     }
 
@@ -96,11 +123,15 @@ struct SearchView: View {
             LazyVStack(spacing: 16) {
                 ForEach(viewModel.results) { attraction in
                     NavigationLink {
-                        AttractionDetailView(attraction: attraction)
+                        AttractionDetailView(
+                            attraction: attraction,
+                            isInItinerary: viewModel.inDraft(attraction),
+                            onAddToItinerary: { _ in viewModel.toggleDraft(attraction) })
                     } label: {
-                        AttractionCardView(attraction: attraction, onAdd: {
-                            // Wired to itinerary saving in a later step.
-                        })
+                        AttractionCardView(
+                            attraction: attraction,
+                            isAdded: viewModel.inDraft(attraction),
+                            onAdd: { viewModel.toggleDraft(attraction) })
                     }
                     .buttonStyle(.plain)
                 }

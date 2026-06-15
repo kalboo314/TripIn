@@ -11,6 +11,32 @@ final class SearchViewModel: ObservableObject {
     @Published var hasSearched: Bool = false
     @Published var errorMessage: String?
 
+    /// Places the user has picked to assemble their own itinerary.
+    @Published var draft: [Attraction] = []
+
+    func toggleDraft(_ attraction: Attraction) {
+        if let index = draft.firstIndex(where: { $0.id == attraction.id }) {
+            draft.remove(at: index)
+        } else {
+            draft.append(attraction)
+        }
+    }
+
+    func inDraft(_ attraction: Attraction) -> Bool {
+        draft.contains { $0.id == attraction.id }
+    }
+
+    func clearDraft() { draft.removeAll() }
+
+    func weatherSummary() -> WeatherSummary {
+        WeatherSummary(
+            condition: weather?.condition ?? "",
+            temperature: weather?.temperature ?? 0,
+            uvIndex: weather?.uvIndex ?? 0,
+            recommendation: recommendedCategory ?? ""
+        )
+    }
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AttractionCardView: View {
     let attraction: Attraction
+    var isAdded: Bool = false
     var onAdd: (() -> Void)? = nil
 
     var body: some View {
@@ -24,12 +25,13 @@ struct AttractionCardView: View {
 
                 if let onAdd = onAdd {
                     Button(action: onAdd) {
-                        Label("Add to itinerary", systemImage: "plus.circle.fill")
+                        Label(isAdded ? "Added to itinerary" : "Add to itinerary",
+                              systemImage: isAdded ? "checkmark.circle.fill" : "plus.circle.fill")
                             .font(.subheadline.bold())
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Theme.coral)
+                    .tint(isAdded ? .green : Theme.coral)
                     .padding(.top, 4)
                 }
             }

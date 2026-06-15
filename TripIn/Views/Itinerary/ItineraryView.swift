@@ -7,11 +7,14 @@ struct ItineraryView: View {
 
     @EnvironmentObject private var authViewModel: AuthViewModel
     @StateObject private var viewModel = ItineraryViewModel()
+    @Environment(\.dismiss) private var dismiss
 
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
         span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
     )
+    @State private var showEdit = false
+    @State private var showDeleteConfirm = false
 
     private var pins: [PinItem] {
         itinerary.slots.compactMap { slot in
@@ -47,6 +50,41 @@ struct ItineraryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if let r = computeRegion() { region = r }
+        }
+        .toolbar {
+            if isReadOnly {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
+                        Button(role: .destructive) { showDeleteConfirm = true } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .confirmationDialog("Delete this trip?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await deleteTrip() } }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showEdit) {
+            NavigationStack {
+                EditItineraryView(viewModel: .edit(itinerary))
+            }
+            .environmentObject(authViewModel)
+        }
+    }
+
+    private func deleteTrip() async {
+        guard let uid = authViewModel.currentUser?.id else { return }
+        do {
+            try await FirestoreService.shared.deleteTrip(tripId: itinerary.id, for: uid)
+            dismiss()
+        } catch {
+            viewModel.errorMessage = (error as? LocalizedError)?.errorDescription
+                ?? "Could not delete trip. Please try again."
         }
     }
 

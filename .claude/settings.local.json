@@ -22,7 +22,8 @@
       "Bash(curl -s https://api.deepseek.com/v1/chat/completions -H 'Content-Type: application/json' -H 'Authorization: Bearer __TRACKED_VAR__' -d '{\"model\":\"deepseek-chat\", *)",
       "Bash(python3 -c ' *)",
       "Bash(grep -E \"error:|BUILD SUCCEEDED|BUILD FAILED|EXIT=\" /tmp/build_step11b.log)",
-      "Bash(curl -s https://api.deepseek.com/v1/chat/completions -H 'Content-Type: application/json' -H 'Authorization: Bearer __TRACKED_VAR__' -d '{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Give concise travel tips for visiting \\\\\"Tanah Lot Temple\\\\\" \\(temple\\) at Tabanan, Bali. Return ONLY a JSON object, no markdown: {\\\\\"wear\\\\\":\\\\\"...\\\\\",\\\\\"bring\\\\\":\\\\\"...\\\\\",\\\\\"bestTime\\\\\":\\\\\"...\\\\\"} Each value is one short, practical sentence.\"}]}' -o /tmp/tips.json)"
+      "Bash(curl -s https://api.deepseek.com/v1/chat/completions -H 'Content-Type: application/json' -H 'Authorization: Bearer __TRACKED_VAR__' -d '{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Give concise travel tips for visiting \\\\\"Tanah Lot Temple\\\\\" \\(temple\\) at Tabanan, Bali. Return ONLY a JSON object, no markdown: {\\\\\"wear\\\\\":\\\\\"...\\\\\",\\\\\"bring\\\\\":\\\\\"...\\\\\",\\\\\"bestTime\\\\\":\\\\\"...\\\\\"} Each value is one short, practical sentence.\"}]}' -o /tmp/tips.json)",
+      "Bash(grep -E \"error:|BUILD SUCCEEDED|BUILD FAILED|EXIT=\" /tmp/build_fix.log)"
     ],
     "additionalDirectories": [
       "/tmp"

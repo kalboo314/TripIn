@@ -39,7 +39,7 @@ struct HomeView: View {
                         .tint(Theme.coral)
                 }
             }
-            .task { await load() }
+            .onAppear { Task { await load() } }
         }
     }
 

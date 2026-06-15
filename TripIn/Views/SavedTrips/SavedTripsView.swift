@@ -29,7 +29,7 @@ struct SavedTripsView: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Saved Trips")
-            .task { await load() }
+            .onAppear { Task { await load() } }
             .alert("Couldn't delete trip",
                    isPresented: Binding(
                     get: { viewModel.errorMessage != nil && !viewModel.savedTrips.isEmpty },
