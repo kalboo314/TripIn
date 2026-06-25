@@ -31,6 +31,16 @@ struct TimeSlotCardView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
 
+                // ML-predicted visit duration (attractions only).
+                if slot.type == .attraction, let durationText = slot.durationDisplay {
+                    Text(durationText)
+                        .font(.caption2.weight(.medium))
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Theme.coral.opacity(0.12))
+                        .foregroundColor(Theme.coral)
+                        .clipShape(Capsule())
+                }
+
                 if !slot.tip.isEmpty {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "lightbulb.fill").foregroundColor(.yellow)

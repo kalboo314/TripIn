@@ -10,17 +10,17 @@ struct RegisterView: View {
 
     var body: some View {
         ZStack {
-            Theme.navy.ignoresSafeArea()
+            Theme.backgroundGradient.ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 24) {
                     VStack(spacing: 8) {
                         Text("Create Account")
                             .font(.largeTitle.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(Theme.navy)
                         Text("Start planning smarter trips.")
                             .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(Theme.textSecondary)
                     }
                     .padding(.top, 40)
 
@@ -46,7 +46,7 @@ struct RegisterView: View {
                             }
                         } label: {
                             if authViewModel.isLoading {
-                                ProgressView().tint(.white).frame(maxWidth: .infinity)
+                                ProgressView().tint(Theme.coral).frame(maxWidth: .infinity)
                             } else {
                                 Text("Register").frame(maxWidth: .infinity)
                             }
@@ -62,7 +62,7 @@ struct RegisterView: View {
 
                     Button { dismiss() } label: {
                         HStack(spacing: 4) {
-                            Text("Already have an account?").foregroundColor(.white.opacity(0.7))
+                            Text("Already have an account?").foregroundColor(Theme.textSecondary)
                             Text("Sign In").foregroundColor(Theme.coral).bold()
                         }
                         .font(.subheadline)

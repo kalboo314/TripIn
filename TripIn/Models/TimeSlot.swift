@@ -11,15 +11,19 @@ enum SlotType: String, Codable {
 struct TimeSlot: Codable, Identifiable {
     let id: String
     let time: String
-    let endTime: String
+    var endTime: String
     let type: SlotType
     let title: String
     let description: String
     let location: String
     let estimatedCost: String
     let tip: String
-    let durationMinutes: Int
+    var durationMinutes: Int
     let coordinate: CLLocationCoordinate2D?
+
+    // ML duration enrichment (DurationEstimator).
+    var durationDisplay: String?      // e.g. "2 – 3 hrs"
+    var mlPredictedMinutes: Int?      // raw minutes from ML prediction
 
     init(
         id: String = UUID().uuidString,
@@ -32,7 +36,9 @@ struct TimeSlot: Codable, Identifiable {
         estimatedCost: String,
         tip: String,
         durationMinutes: Int,
-        coordinate: CLLocationCoordinate2D? = nil
+        coordinate: CLLocationCoordinate2D? = nil,
+        durationDisplay: String? = nil,
+        mlPredictedMinutes: Int? = nil
     ) {
         self.id = id
         self.time = time
@@ -45,6 +51,8 @@ struct TimeSlot: Codable, Identifiable {
         self.tip = tip
         self.durationMinutes = durationMinutes
         self.coordinate = coordinate
+        self.durationDisplay = durationDisplay
+        self.mlPredictedMinutes = mlPredictedMinutes
     }
 
     // CLLocationCoordinate2D isn't Codable, so we flatten it to lat/lng.
@@ -52,6 +60,7 @@ struct TimeSlot: Codable, Identifiable {
         case id, time, endTime, type, title, description
         case location, estimatedCost, tip, durationMinutes
         case latitude, longitude
+        case durationDisplay, mlPredictedMinutes
     }
 
     init(from decoder: Decoder) throws {
@@ -72,6 +81,8 @@ struct TimeSlot: Codable, Identifiable {
         } else {
             coordinate = nil
         }
+        durationDisplay = try c.decodeIfPresent(String.self, forKey: .durationDisplay)
+        mlPredictedMinutes = try c.decodeIfPresent(Int.self, forKey: .mlPredictedMinutes)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -88,5 +99,7 @@ struct TimeSlot: Codable, Identifiable {
         try c.encode(durationMinutes, forKey: .durationMinutes)
         try c.encodeIfPresent(coordinate?.latitude, forKey: .latitude)
         try c.encodeIfPresent(coordinate?.longitude, forKey: .longitude)
+        try c.encodeIfPresent(durationDisplay, forKey: .durationDisplay)
+        try c.encodeIfPresent(mlPredictedMinutes, forKey: .mlPredictedMinutes)
     }
 }

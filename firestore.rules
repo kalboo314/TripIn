@@ -3,13 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // A user document and everything under it (including the trips
-    // subcollection) is readable/writable only by that authenticated user.
+    // A user owns their document and ALL subcollections under it
+    // (trips, diary, …).
     match /users/{userId} {
       allow read, write: if isOwner(userId);
 
-      // users/{userId}/trips/{tripId}
-      match /trips/{tripId} {
+      match /{document=**} {
         allow read, write: if isOwner(userId);
       }
     }

@@ -69,6 +69,16 @@ enum AgentTools {
         ]
     }
 
+    /// Tool set for the multi-day generator: weather is pre-fetched (Strategy 1),
+    /// so get_weather_forecast is excluded.
+    static var tripToolDefinitions: [[String: Any]] {
+        definitions.filter { dict in
+            guard let fn = dict["function"] as? [String: Any],
+                  let name = fn["name"] as? String else { return false }
+            return name != Name.getWeatherForecast.rawValue
+        }
+    }
+
     private static func function(name: Name,
                                  description: String,
                                  properties: [String: Any],

@@ -18,11 +18,25 @@ final class PlacesService {
     static let shared = PlacesService()
     private init() {}
 
-    private let textSearchURL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-    private let detailsURL    = "https://maps.googleapis.com/maps/api/place/details/json"
-    private let photoURL      = "https://maps.googleapis.com/maps/api/place/photo"
+    private let textSearchURL   = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+    private let detailsURL      = "https://maps.googleapis.com/maps/api/place/details/json"
+    private let photoURL        = "https://maps.googleapis.com/maps/api/place/photo"
+    private let autocompleteURL = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
+
+    /// Strategy 2: cache full search results keyed by "category_city" so the
+    /// same category+city is never fetched twice in a session (any limit reuses it).
+    private var searchCache: [String: [Attraction]] = [:]
+
+    /// City-autocomplete cache (last 10 queries → suggestions).
+    private var autocompleteCache: [String: [CitysuggestionModel]] = [:]
+    private var autocompleteOrder: [String] = []
 
     func searchAttractions(category: String, city: String, limit: Int) async throws -> [Attraction] {
+        let cacheKey = "\(category.lowercased())_\(city.lowercased())"
+        if let cached = searchCache[cacheKey] {
+            return Array(cached.prefix(max(0, limit)))
+        }
+
         guard var comp = URLComponents(string: textSearchURL) else { throw PlacesError.network }
         comp.queryItems = [
             URLQueryItem(name: "query", value: "\(category) in \(city)"),
@@ -37,9 +51,9 @@ final class PlacesService {
 
         guard !decoded.results.isEmpty else { throw PlacesError.noResults }
 
-        return decoded.results
-            .prefix(max(0, limit))
-            .map { attraction(from: $0, fallbackCategory: category) }
+        let all = decoded.results.map { attraction(from: $0, fallbackCategory: category) }
+        searchCache[cacheKey] = all
+        return Array(all.prefix(max(0, limit)))
     }
 
     func attractionDetail(placeId: String) async throws -> Attraction {
@@ -59,6 +73,45 @@ final class PlacesService {
 
         guard let result = decoded.result else { throw PlacesError.noResults }
         return attraction(from: result, placeId: placeId)
+    }
+
+    /// Google Places Autocomplete restricted to cities. Returns up to 5
+    /// suggestions; [] for queries under 2 chars. Cached per query (last 10).
+    func fetchCitySuggestions(query: String) async throws -> [CitysuggestionModel] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else { return [] }
+
+        let key = trimmed.lowercased()
+        if let cached = autocompleteCache[key] { return cached }
+
+        guard var comp = URLComponents(string: autocompleteURL) else { throw PlacesError.network }
+        comp.queryItems = [
+            URLQueryItem(name: "input", value: trimmed),
+            URLQueryItem(name: "types", value: "(cities)"),
+            URLQueryItem(name: "key", value: Config.placesKey)
+        ]
+        guard let url = comp.url else { throw PlacesError.network }
+
+        let data = try await fetch(url)
+        let decoded: AutocompleteResponse
+        do { decoded = try JSONDecoder().decode(AutocompleteResponse.self, from: data) }
+        catch { throw PlacesError.decoding }
+
+        let suggestions = decoded.predictions.prefix(5).map { p -> CitysuggestionModel in
+            let cityName = p.structured_formatting?.main_text
+                ?? p.description.components(separatedBy: ",").first
+                ?? p.description
+            return CitysuggestionModel(id: p.place_id, cityName: cityName, fullName: p.description)
+        }
+        let result = Array(suggestions)
+
+        autocompleteCache[key] = result
+        autocompleteOrder.append(key)
+        if autocompleteOrder.count > 10 {
+            let oldest = autocompleteOrder.removeFirst()
+            autocompleteCache[oldest] = nil
+        }
+        return result
     }
 
     // MARK: - Networking
@@ -175,4 +228,28 @@ private struct Photo: Decodable {
 private struct OpeningHours: Decodable {
     let open_now: Bool?
     let weekday_text: [String]?
+}
+
+// MARK: - City autocomplete
+
+/// A city suggestion from Google Places Autocomplete.
+struct CitysuggestionModel: Identifiable {
+    let id: String          // Google Places prediction placeId
+    let cityName: String    // "Bali"
+    let fullName: String    // "Bali, Indonesia"
+}
+
+private struct AutocompleteResponse: Decodable {
+    let predictions: [Prediction]
+    let status: String?
+}
+
+private struct Prediction: Decodable {
+    let place_id: String
+    let description: String
+    let structured_formatting: StructuredFormatting?
+}
+
+private struct StructuredFormatting: Decodable {
+    let main_text: String
 }

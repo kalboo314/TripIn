@@ -47,7 +47,7 @@ struct SavedTripsView: View {
                 ZStack {
                     SavedTripCard(trip: trip)
                     NavigationLink {
-                        ItineraryView(itinerary: trip, isReadOnly: true)
+                        ItineraryView(trip: trip, isReadOnly: true)
                     } label: { EmptyView() }
                     .opacity(0)
                 }
@@ -62,6 +62,11 @@ struct SavedTripsView: View {
                     }
                 }
             }
+
+            Color.clear
+                .frame(height: 80)
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
         }
         .listStyle(.plain)
         .refreshable { await load() }
@@ -72,7 +77,7 @@ struct SavedTripsView: View {
         await viewModel.loadSavedTrips(for: userId)
     }
 
-    private func delete(_ trip: ItineraryDay) async {
+    private func delete(_ trip: Trip) async {
         guard let userId else { return }
         await viewModel.delete(trip, for: userId)
     }
@@ -80,19 +85,23 @@ struct SavedTripsView: View {
 
 /// Reusable saved-trip card (used here and in the Home carousel).
 struct SavedTripCard: View {
-    let trip: ItineraryDay
+    let trip: Trip
+
+    private var stopCount: Int { trip.days.reduce(0) { $0 + $1.slots.count } }
+    private var condition: String { trip.days.first?.weather.condition ?? "" }
 
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(Theme.coral.opacity(0.15)).frame(width: 48, height: 48)
-                Image(systemName: weatherIcon(trip.weather.condition))
+                Image(systemName: weatherIcon(condition))
                     .foregroundColor(Theme.coral)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(trip.city).font(.headline).foregroundColor(Theme.navy)
-                Text(trip.date).font(.caption).foregroundColor(.secondary)
-                Text("\(trip.slots.count) stops · \(trip.totalEstimatedCost)")
+                Text("\(trip.startDate) · \(trip.numberOfDays) day\(trip.numberOfDays > 1 ? "s" : "")")
+                    .font(.caption).foregroundColor(.secondary)
+                Text("\(stopCount) stops · \(trip.totalTripCost)")
                     .font(.caption).foregroundColor(.secondary)
             }
             Spacer()

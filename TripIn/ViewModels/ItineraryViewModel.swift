@@ -6,7 +6,7 @@ final class ItineraryViewModel: ObservableObject {
     @Published var didSave: Bool = false
     @Published var errorMessage: String?
 
-    func save(_ trip: ItineraryDay, for userId: String) async {
+    func save(_ trip: Trip, for userId: String) async {
         errorMessage = nil
         isSaving = true
         defer { isSaving = false }
@@ -20,20 +20,18 @@ final class ItineraryViewModel: ObservableObject {
     }
 
     /// Plain-text summary used by the Share button.
-    func shareSummary(_ trip: ItineraryDay) -> String {
-        var lines: [String] = [
-            "TripIn — \(trip.city) (\(trip.date))",
-            "Weather: \(trip.weather.condition), \(Int(trip.weather.temperature))°C",
-            ""
-        ]
-        for slot in trip.slots {
-            lines.append("\(slot.time)–\(slot.endTime)  \(slot.title)  [\(slot.estimatedCost)]")
+    func shareSummary(_ trip: Trip) -> String {
+        var lines: [String] = ["TripIn — \(trip.city) (\(trip.startDate), \(trip.numberOfDays) day\(trip.numberOfDays > 1 ? "s" : ""))", ""]
+        for (index, day) in trip.days.enumerated() {
+            if trip.numberOfDays > 1 {
+                lines.append("Day \(index + 1) — \(day.date) (\(day.weather.condition), \(Int(day.weather.temperature))°C)")
+            }
+            for slot in day.slots {
+                lines.append("  \(slot.time)–\(slot.endTime)  \(slot.title)  [\(slot.estimatedCost)]")
+            }
+            lines.append("")
         }
-        lines.append("")
-        if !trip.packingList.isEmpty {
-            lines.append("Packing: \(trip.packingList.joined(separator: ", "))")
-        }
-        lines.append("Total: \(trip.totalEstimatedCost)")
+        lines.append("Total: \(trip.totalTripCost)")
         return lines.joined(separator: "\n")
     }
 }

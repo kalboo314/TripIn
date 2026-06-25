@@ -10,7 +10,7 @@ struct LoginView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.navy.ignoresSafeArea()
+                Theme.backgroundGradient.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -33,7 +33,7 @@ struct LoginView: View {
                                 Task { await authViewModel.signIn(email: email, password: password) }
                             } label: {
                                 if authViewModel.isLoading {
-                                    ProgressView().tint(.white).frame(maxWidth: .infinity)
+                                    ProgressView().tint(Theme.coral).frame(maxWidth: .infinity)
                                 } else {
                                     Text("Sign In").frame(maxWidth: .infinity)
                                 }
@@ -48,7 +48,7 @@ struct LoginView: View {
 
                         Button { showRegister = true } label: {
                             HStack(spacing: 4) {
-                                Text("Don't have an account?").foregroundColor(.white.opacity(0.7))
+                                Text("Don't have an account?").foregroundColor(Theme.textSecondary)
                                 Text("Register").foregroundColor(Theme.coral).bold()
                             }
                             .font(.subheadline)
@@ -70,10 +70,10 @@ struct LoginView: View {
                 .foregroundColor(Theme.coral)
             Text("TripIn")
                 .font(.largeTitle.bold())
-                .foregroundColor(.white)
+                .foregroundColor(Theme.navy)
             Text("Plan your perfect day, rain or shine.")
                 .font(.subheadline)
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(Theme.textSecondary)
         }
         .padding(.top, 60)
     }

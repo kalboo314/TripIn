@@ -9,19 +9,18 @@ struct AttractionCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             photo
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(attraction.name)
                     .font(.headline)
                     .foregroundColor(Theme.navy)
                     .lineLimit(1)
 
-                HStack {
+                HStack(spacing: 8) {
                     categoryBadge
+                    ratingPill
                     Spacer()
                     costBadge
                 }
-
-                ratingStars
 
                 if let onAdd = onAdd {
                     Button(action: onAdd) {
@@ -32,14 +31,15 @@ struct AttractionCardView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(isAdded ? .green : Theme.coral)
-                    .padding(.top, 4)
+                    .controlSize(.regular)
+                    .padding(.top, 2)
                 }
             }
-            .padding(Theme.padding)
+            .padding(14)
         }
         .background(Theme.card)
-        .cornerRadius(Theme.cardRadius)
-        .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
     }
 
     // MARK: - Pieces
@@ -58,8 +58,13 @@ struct AttractionCardView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 160)
+        .frame(height: 170)
         .clipped()
+        .overlay(
+            // subtle bottom scrim so the white card meets the photo softly
+            LinearGradient(colors: [.clear, .black.opacity(0.18)],
+                           startPoint: .center, endPoint: .bottom)
+        )
     }
 
     private var placeholder: some View {
@@ -73,40 +78,31 @@ struct AttractionCardView: View {
 
     private var categoryBadge: some View {
         Text(attraction.category.capitalized)
-            .font(.caption).bold()
-            .padding(.horizontal, 8).padding(.vertical, 4)
+            .font(.caption2).bold()
+            .padding(.horizontal, 9).padding(.vertical, 5)
             .background(Theme.coral.opacity(0.15))
             .foregroundColor(Theme.coral)
-            .cornerRadius(6)
+            .clipShape(Capsule())
+    }
+
+    private var ratingPill: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "star.fill").font(.system(size: 9))
+            Text(String(format: "%.1f", attraction.rating)).font(.caption2.bold())
+        }
+        .padding(.horizontal, 9).padding(.vertical, 5)
+        .background(Color.yellow.opacity(0.18))
+        .foregroundColor(.orange)
+        .clipShape(Capsule())
+        .opacity(attraction.rating > 0 ? 1 : 0)
     }
 
     private var costBadge: some View {
         Text(attraction.estimatedCost)
-            .font(.caption).bold()
-            .padding(.horizontal, 8).padding(.vertical, 4)
+            .font(.caption2).bold()
+            .padding(.horizontal, 9).padding(.vertical, 5)
             .background(Color(.systemGray6))
             .foregroundColor(.secondary)
-            .cornerRadius(6)
-    }
-
-    private var ratingStars: some View {
-        HStack(spacing: 2) {
-            ForEach(0..<5, id: \.self) { index in
-                Image(systemName: starName(for: index))
-                    .font(.caption)
-                    .foregroundColor(.yellow)
-            }
-            Text(String(format: "%.1f", attraction.rating))
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.leading, 2)
-        }
-    }
-
-    private func starName(for index: Int) -> String {
-        let value = Double(index)
-        if value + 1 <= attraction.rating { return "star.fill" }
-        if value + 0.5 <= attraction.rating { return "star.leadinghalf.filled" }
-        return "star"
+            .clipShape(Capsule())
     }
 }

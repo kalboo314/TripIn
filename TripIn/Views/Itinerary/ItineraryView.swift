@@ -2,22 +2,33 @@ import SwiftUI
 import MapKit
 
 struct ItineraryView: View {
-    let itinerary: ItineraryDay
+    let trip: Trip
     var isReadOnly: Bool = false
 
     @EnvironmentObject private var authViewModel: AuthViewModel
     @StateObject private var viewModel = ItineraryViewModel()
     @Environment(\.dismiss) private var dismiss
 
+    @State private var selectedDay = 0
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
         span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
     )
     @State private var showEdit = false
     @State private var showDeleteConfirm = false
+    @State private var legEstimates: [String] = []
+    @State private var isAddingToCalendar = false
+    @State private var showCalendarAlert = false
+    @State private var calendarMessage = ""
+
+    private var day: ItineraryDay { trip.days[min(selectedDay, trip.days.count - 1)] }
+    private var isMultiDay: Bool { trip.numberOfDays > 1 || trip.days.count > 1 }
+
+    /// Cached (baked-in) legs if available, else the live free-estimator fallback.
+    private var legs: [String] { day.legEstimates ?? legEstimates }
 
     private var pins: [PinItem] {
-        itinerary.slots.compactMap { slot in
+        day.slots.compactMap { slot in
             slot.coordinate.map { PinItem(id: slot.id, coordinate: $0, title: slot.title) }
         }
     }
@@ -34,7 +45,9 @@ struct ItineraryView: View {
                     .allowsHitTesting(false)
                 }
 
-                header
+                tripHeader
+                if isMultiDay { dayPicker }
+                dayHeader
                 timeline
                 packingSection
                 costFooter
@@ -42,20 +55,37 @@ struct ItineraryView: View {
                     Text(error).font(.footnote).foregroundColor(.red)
                 }
                 actionButtons
+                calendarButton
             }
             .padding(Theme.padding)
+            .padding(.bottom, 90)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle(itinerary.city)
+        .alert("Calendar", isPresented: $showCalendarAlert) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(calendarMessage) }
+        .navigationTitle(trip.city)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
+        .onAppear { if let r = computeRegion() { region = r } }
+        .onChange(of: selectedDay) { _ in
             if let r = computeRegion() { region = r }
+        }
+        .task(id: selectedDay) {
+            // Use baked-in legs when present; otherwise compute the free estimate live.
+            if day.legEstimates == nil {
+                legEstimates = await TravelEstimator.shared.legEstimates(for: day.slots)
+            } else {
+                legEstimates = []
+            }
         }
         .toolbar {
             if isReadOnly {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
+                        // Editing is single-day only for now.
+                        if !isMultiDay {
+                            Button { showEdit = true } label: { Label("Edit", systemImage: "pencil") }
+                        }
                         Button(role: .destructive) { showDeleteConfirm = true } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -71,7 +101,7 @@ struct ItineraryView: View {
         }
         .sheet(isPresented: $showEdit) {
             NavigationStack {
-                EditItineraryView(viewModel: .edit(itinerary))
+                EditItineraryView(viewModel: .edit(trip))
             }
             .environmentObject(authViewModel)
         }
@@ -80,7 +110,7 @@ struct ItineraryView: View {
     private func deleteTrip() async {
         guard let uid = authViewModel.currentUser?.id else { return }
         do {
-            try await FirestoreService.shared.deleteTrip(tripId: itinerary.id, for: uid)
+            try await FirestoreService.shared.deleteTrip(tripId: trip.id, for: uid)
             dismiss()
         } catch {
             viewModel.errorMessage = (error as? LocalizedError)?.errorDescription
@@ -90,16 +120,40 @@ struct ItineraryView: View {
 
     // MARK: - Sections
 
-    private var header: some View {
+    private var tripHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(itinerary.city).font(.title2.bold()).foregroundColor(Theme.navy)
-                Text(itinerary.date).font(.subheadline).foregroundColor(.secondary)
+                Text(trip.city).font(.title2.bold()).foregroundColor(Theme.navy)
+                Text(isMultiDay
+                     ? "\(trip.startDate) · \(trip.numberOfDays) days"
+                     : trip.startDate)
+                    .font(.subheadline).foregroundColor(.secondary)
             }
             Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("Trip total").font(.caption2).foregroundColor(.secondary)
+                Text(trip.totalTripCost).font(.subheadline.bold()).foregroundColor(Theme.navy)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var dayPicker: some View {
+        Picker("Day", selection: $selectedDay) {
+            ForEach(0..<trip.days.count, id: \.self) { index in
+                Text("Day \(index + 1)").tag(index)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var dayHeader: some View {
+        HStack {
+            Text(day.date).font(.subheadline).foregroundColor(.secondary)
+            Spacer()
             HStack(spacing: 8) {
-                Image(systemName: icon(for: itinerary.weather.condition))
-                Text("\(Int(itinerary.weather.temperature))°C")
+                Image(systemName: icon(for: day.weather.condition))
+                Text("\(Int(day.weather.temperature))°C")
             }
             .font(.subheadline.bold())
             .foregroundColor(.white)
@@ -107,14 +161,32 @@ struct ItineraryView: View {
             .background(Theme.coral)
             .cornerRadius(Theme.buttonRadius)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var timeline: some View {
         VStack(spacing: 12) {
-            ForEach(itinerary.slots) { slot in
+            ForEach(Array(day.slots.enumerated()), id: \.element.id) { index, slot in
                 TimeSlotCardView(slot: slot)
+                if index < day.slots.count - 1,
+                   index < legs.count,
+                   !legs[index].isEmpty {
+                    legConnector(legs[index])
+                }
             }
+        }
+    }
+
+    /// Travel distance/time estimate shown between two consecutive stops.
+    private func legConnector(_ text: String) -> some View {
+        HStack {
+            Spacer()
+            Text(text)
+                .font(.caption2)
+                .foregroundColor(Theme.textSecondary)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(Color(.systemGray6))
+                .clipShape(Capsule())
+            Spacer()
         }
     }
 
@@ -124,7 +196,7 @@ struct ItineraryView: View {
                 .font(.headline)
                 .foregroundColor(Theme.navy)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 8)], alignment: .leading, spacing: 8) {
-                ForEach(itinerary.packingList, id: \.self) { item in
+                ForEach(day.packingList, id: \.self) { item in
                     Text(item)
                         .font(.caption)
                         .padding(.horizontal, 10).padding(.vertical, 6)
@@ -139,9 +211,10 @@ struct ItineraryView: View {
 
     private var costFooter: some View {
         HStack {
-            Text("Total estimated cost").font(.subheadline).foregroundColor(.secondary)
+            Text(isMultiDay ? "Day total" : "Total estimated cost")
+                .font(.subheadline).foregroundColor(.secondary)
             Spacer()
-            Text(itinerary.totalEstimatedCost).font(.headline).foregroundColor(Theme.navy)
+            Text(day.totalEstimatedCost).font(.headline).foregroundColor(Theme.navy)
         }
         .padding(Theme.padding)
         .background(Theme.card)
@@ -154,7 +227,7 @@ struct ItineraryView: View {
                 Button {
                     Task {
                         if let uid = authViewModel.currentUser?.id {
-                            await viewModel.save(itinerary, for: uid)
+                            await viewModel.save(trip, for: uid)
                         }
                     }
                 } label: {
@@ -170,12 +243,38 @@ struct ItineraryView: View {
                 .disabled(viewModel.isSaving || viewModel.didSave)
             }
 
-            ShareLink(item: viewModel.shareSummary(itinerary)) {
+            ShareLink(item: viewModel.shareSummary(trip)) {
                 Label("Share", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(PrimaryButtonStyle())
         }
+    }
+
+    private var calendarButton: some View {
+        Button { Task { await addToCalendar() } } label: {
+            if isAddingToCalendar {
+                ProgressView().tint(Theme.coral).frame(maxWidth: .infinity)
+            } else {
+                Label("Add to Calendar", systemImage: "calendar.badge.plus")
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .buttonStyle(SecondaryButtonStyle())
+        .disabled(isAddingToCalendar)
+    }
+
+    private func addToCalendar() async {
+        isAddingToCalendar = true
+        defer { isAddingToCalendar = false }
+        do {
+            let n = try await CalendarService.shared.addTrip(trip)
+            calendarMessage = "Added \(n) event\(n == 1 ? "" : "s") to your Calendar."
+        } catch {
+            calendarMessage = (error as? LocalizedError)?.errorDescription
+                ?? "Could not add to calendar."
+        }
+        showCalendarAlert = true
     }
 
     // MARK: - Helpers

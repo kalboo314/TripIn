@@ -23,6 +23,9 @@ final class WeatherService {
     /// In-memory cache keyed by "city|date".
     private var cache: [String: WeatherData] = [:]
 
+    /// In-memory cache for multi-day forecasts keyed by "city_days".
+    private var multiDayCache: [String: [WeatherData]] = [:]
+
     /// `date` is expected as "yyyy-MM-dd".
     func fetchForecast(city: String, date: String) async throws -> WeatherData {
         let key = "\(city.lowercased())|\(date)"
@@ -77,6 +80,84 @@ final class WeatherService {
 
         cache[key] = weatherData
         return weatherData
+    }
+
+    /// Strategy 1: ONE API call returns up to 5 days of forecast; we parse it
+    /// into one WeatherData per day (midday reading). Cached per "city_days".
+    /// If the API covers fewer days than requested, the last day is repeated.
+    func fetchMultiDayForecast(city: String, days: Int) async throws -> [WeatherData] {
+        let clampedDays = max(1, min(days, 7))
+        let key = "\(city.lowercased())_\(clampedDays)"
+        if let cached = multiDayCache[key] { return cached }
+
+        guard var components = URLComponents(string: baseURL) else { throw WeatherError.network }
+        components.queryItems = [
+            URLQueryItem(name: "q", value: city),
+            URLQueryItem(name: "appid", value: Config.weatherKey),
+            URLQueryItem(name: "units", value: "metric")
+        ]
+        guard let url = components.url else { throw WeatherError.network }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(from: url)
+        } catch {
+            throw WeatherError.network
+        }
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 404 { throw WeatherError.cityNotFound }
+            guard (200...299).contains(http.statusCode) else { throw WeatherError.network }
+        }
+
+        let decoded: OWMForecastResponse
+        do {
+            decoded = try JSONDecoder().decode(OWMForecastResponse.self, from: data)
+        } catch {
+            throw WeatherError.decoding
+        }
+
+        // Group 3-hour entries by calendar day, preserving order.
+        var byDate: [String: [OWMEntry]] = [:]
+        var dayOrder: [String] = []
+        for entry in decoded.list {
+            let day = String(entry.dt_txt.prefix(10))
+            if byDate[day] == nil { dayOrder.append(day) }
+            byDate[day, default: []].append(entry)
+        }
+
+        let cityName = decoded.city.name.isEmpty ? city : decoded.city.name
+        var result: [WeatherData] = []
+        for day in dayOrder.prefix(clampedDays) {
+            guard let entries = byDate[day], !entries.isEmpty else { continue }
+            let entry = entries.min { distanceToNoon($0.dt_txt) < distanceToNoon($1.dt_txt) } ?? entries[0]
+            result.append(makeWeatherData(from: entry, city: cityName, dateString: day))
+        }
+
+        // Pad out to the requested number of days (free API only covers ~5).
+        if let last = result.last {
+            while result.count < clampedDays { result.append(last) }
+        }
+        guard !result.isEmpty else { throw WeatherError.decoding }
+
+        multiDayCache[key] = result
+        return result
+    }
+
+    private func makeWeatherData(from entry: OWMEntry, city: String, dateString: String) -> WeatherData {
+        let condition = mapCondition(entry.weather.first?.main ?? "")
+        let month = monthIndex(from: dateString)
+        return WeatherData(
+            city: city,
+            temperature: entry.main.temp,
+            humidity: entry.main.humidity,
+            windSpeed: entry.wind.speed,
+            precipitation: (entry.pop ?? 0) * 100,
+            uvIndex: estimateUVIndex(condition: condition, month: month),
+            condition: condition,
+            season: season(for: month),
+            location: locationType(for: city)
+        )
     }
 
     // MARK: - Forecast selection

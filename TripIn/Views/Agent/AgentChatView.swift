@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AgentChatView: View {
+    var prefillCity: String? = nil
+
     @StateObject private var viewModel = AgentViewModel()
     @State private var showItinerary = false
 
@@ -16,7 +18,7 @@ struct AgentChatView: View {
                             if viewModel.isThinking {
                                 typingIndicator.id("typing")
                             }
-                            if viewModel.resultItinerary != nil {
+                            if viewModel.resultTrip != nil {
                                 viewItineraryButton.id("result")
                             }
                         }
@@ -32,11 +34,16 @@ struct AgentChatView: View {
             .navigationTitle("Travel Agent")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showItinerary) {
-                if let itinerary = viewModel.resultItinerary {
-                    ItineraryView(itinerary: itinerary)
+                if let trip = viewModel.resultTrip {
+                    ItineraryView(trip: trip)
                 }
             }
-            .onAppear { viewModel.seedGreetingIfNeeded() }
+            .onAppear {
+                viewModel.seedGreetingIfNeeded()
+                if let city = prefillCity, !city.isEmpty, viewModel.inputText.isEmpty {
+                    viewModel.inputText = "Plan my day in \(city)"
+                }
+            }
         }
     }
 
@@ -101,7 +108,7 @@ struct AgentChatView: View {
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         withAnimation {
-            if viewModel.resultItinerary != nil {
+            if viewModel.resultTrip != nil {
                 proxy.scrollTo("result", anchor: .bottom)
             } else if viewModel.isThinking {
                 proxy.scrollTo("typing", anchor: .bottom)

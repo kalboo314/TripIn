@@ -10,24 +10,28 @@ final class TripBuilderViewModel: ObservableObject {
     @Published var isSaving: Bool = false
     @Published var errorMessage: String?
 
-    private let existingId: String?       // non-nil when editing a saved trip
+    private let existingTripId: String?   // non-nil when editing a saved trip
     private let createdAt: Date
     private let weather: WeatherSummary
     private let packingList: [String]
-    private let totalEstimatedCost: String
+    private let dailyBudget: Double
+    private let currency: String
+    private let totalCost: String
 
-    var isEditing: Bool { existingId != nil }
+    var isEditing: Bool { existingTripId != nil }
 
     private init(city: String, date: Date, slots: [TimeSlot], weather: WeatherSummary,
-                 packingList: [String], totalEstimatedCost: String,
-                 existingId: String?, createdAt: Date) {
+                 packingList: [String], dailyBudget: Double, currency: String,
+                 totalCost: String, existingTripId: String?, createdAt: Date) {
         self.city = city
         self.date = date
         self.slots = slots
         self.weather = weather
         self.packingList = packingList
-        self.totalEstimatedCost = totalEstimatedCost
-        self.existingId = existingId
+        self.dailyBudget = dailyBudget
+        self.currency = currency
+        self.totalCost = totalCost
+        self.existingTripId = existingTripId
         self.createdAt = createdAt
     }
 
@@ -37,24 +41,28 @@ final class TripBuilderViewModel: ObservableObject {
                                    attractions: [Attraction],
                                    weather: WeatherSummary) -> TripBuilderViewModel {
         let vm = TripBuilderViewModel(city: city, date: date, slots: [], weather: weather,
-                                      packingList: [], totalEstimatedCost: "Varies",
-                                      existingId: nil, createdAt: Date())
+                                      packingList: [], dailyBudget: 0, currency: "IDR",
+                                      totalCost: "Varies", existingTripId: nil, createdAt: Date())
         vm.slots = attractions.map { vm.makeSlot(from: $0) }
         vm.recomputeTimes()
         return vm
     }
 
-    static func edit(_ trip: ItineraryDay) -> TripBuilderViewModel {
+    /// Edits an existing (single-day) trip. Only the first day is editable here.
+    static func edit(_ trip: Trip) -> TripBuilderViewModel {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        let day = trip.days.first
         return TripBuilderViewModel(
             city: trip.city,
-            date: formatter.date(from: trip.date) ?? Date(),
-            slots: trip.slots,
-            weather: trip.weather,
-            packingList: trip.packingList,
-            totalEstimatedCost: trip.totalEstimatedCost,
-            existingId: trip.id,
+            date: formatter.date(from: trip.startDate) ?? Date(),
+            slots: day?.slots ?? [],
+            weather: day?.weather ?? WeatherSummary(condition: "", temperature: 0, uvIndex: 0, recommendation: ""),
+            packingList: day?.packingList ?? [],
+            dailyBudget: trip.dailyBudget,
+            currency: trip.currency,
+            totalCost: trip.totalTripCost,
+            existingTripId: trip.id,
             createdAt: trip.createdAt
         )
     }
@@ -93,7 +101,8 @@ final class TripBuilderViewModel: ObservableObject {
         isSaving = true
         defer { isSaving = false }
         do {
-            try await FirestoreService.shared.saveTrip(buildTrip(), for: userId)
+            let trip = await DistanceService.shared.enrich(buildTrip())
+            try await FirestoreService.shared.saveTrip(trip, for: userId)
             return true
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription
@@ -102,17 +111,29 @@ final class TripBuilderViewModel: ObservableObject {
         }
     }
 
-    func buildTrip() -> ItineraryDay {
+    func buildTrip() -> Trip {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        return ItineraryDay(
-            id: existingId ?? UUID().uuidString,
-            date: formatter.string(from: date),
+        let dateString = formatter.string(from: date)
+        let day = ItineraryDay(
+            id: UUID().uuidString,
+            date: dateString,
             city: city,
             weather: weather,
             slots: slots,
             packingList: packingList,
-            totalEstimatedCost: totalEstimatedCost,
+            totalEstimatedCost: totalCost,
+            createdAt: createdAt
+        )
+        return Trip(
+            id: existingTripId ?? UUID().uuidString,
+            city: city,
+            startDate: dateString,
+            numberOfDays: 1,
+            dailyBudget: dailyBudget,
+            currency: currency,
+            totalTripCost: totalCost,
+            days: [day],
             createdAt: createdAt
         )
     }

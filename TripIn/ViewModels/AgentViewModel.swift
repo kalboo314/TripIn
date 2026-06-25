@@ -14,7 +14,7 @@ final class AgentViewModel: ObservableObject {
     @Published var inputText: String = ""
     @Published var isThinking: Bool = false
     @Published var statusText: String = ""
-    @Published var resultItinerary: ItineraryDay?
+    @Published var resultTrip: Trip?
     @Published var errorMessage: String?
 
     private var cancellables = Set<AnyCancellable>()
@@ -41,13 +41,13 @@ final class AgentViewModel: ObservableObject {
         messages.append(ChatMessage(role: .user, text: text))
         inputText = ""
         errorMessage = nil
-        resultItinerary = nil
+        resultTrip = nil
         isThinking = true
         statusText = "Thinking…"
 
         do {
             let itinerary = try await AgentService.shared.planTrip(userMessage: text)
-            resultItinerary = itinerary
+            resultTrip = Trip.singleDay(itinerary)
             messages.append(ChatMessage(role: .assistant, text: summary(for: itinerary)))
         } catch {
             let message = (error as? LocalizedError)?.errorDescription
